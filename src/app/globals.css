@@ -1,0 +1,144 @@
+@import "tailwindcss";
+
+/* Minimal 90s Theme - Enterprise Software Aesthetic */
+:root {
+  --background: #c0c0c0; /* Windows gray */
+  --foreground: #000000;
+  --window-bg: #c0c0c0;
+  --title-bar: #000080;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "MS Sans Serif", "Microsoft Sans Serif", "Arial", sans-serif;
+  --font-mono: "Courier New", "Courier", monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Arial", "Helvetica", sans-serif;
+  font-size: 11px;
+}
+
+/* Windows 95 Button */
+.btn-95 {
+  border: 2px solid;
+  border-color: #ffffff #000000 #000000 #ffffff;
+  background: #c0c0c0;
+  padding: 4px 12px;
+  font-family: "Arial", sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+  min-height: 23px;
+}
+
+.btn-95:hover {
+  background: #d4d4d4;
+}
+
+.btn-95:active {
+  border-color: #000000 #ffffff #ffffff #000000;
+  padding: 5px 11px 3px 13px;
+}
+
+.btn-95:disabled {
+  color: #808080;
+  text-shadow: 1px 1px 0px #ffffff;
+}
+
+/* Window Frame */
+.window-95 {
+  border: 2px solid;
+  border-color: #ffffff #000000 #000000 #ffffff;
+  background: #c0c0c0;
+  box-shadow: 1px 1px 0px #000000;
+}
+
+/* Title Bar */
+.title-bar-95 {
+  background: linear-gradient(90deg, #000080 0%, #1084d0 100%);
+  color: #ffffff;
+  padding: 2px 4px;
+  font-weight: bold;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+/* Window Button */
+.window-btn-95 {
+  width: 16px;
+  height: 14px;
+  border: 1px solid;
+  border-color: #ffffff #000000 #000000 #ffffff;
+  background: #c0c0c0;
+  font-size: 9px;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.window-btn-95:active {
+  border-color: #000000 #ffffff #ffffff #000000;
+}
+
+/* Text Input */
+.input-95 {
+  border: 2px solid;
+  border-color: #808080 #ffffff #ffffff #808080;
+  background: #ffffff;
+  padding: 2px 4px;
+  font-family: "Arial", sans-serif;
+  font-size: 11px;
+  line-height: normal;
+}
+
+/* Panel/Group Box */
+.panel-95 {
+  border: 2px solid;
+  border-color: #808080 #ffffff #ffffff #808080;
+  padding: 8px;
+  background: #c0c0c0;
+}
+
+/* Status Bar */
+.status-bar-95 {
+  border-top: 1px solid #ffffff;
+  padding: 2px 4px;
+  font-size: 11px;
+  background: #c0c0c0;
+}
+
+/* Separator */
+.separator-95 {
+  height: 2px;
+  background: #808080;
+  border-bottom: 1px solid #ffffff;
+  margin: 2px 0;
+}
+
+/* Checkbox */
+.checkbox-95 {
+  width: 13px;
+  height: 13px;
+  border: 1px solid;
+  border-color: #808080 #ffffff #ffffff #808080;
+  background: #ffffff;
+  appearance: none;
+  cursor: pointer;
+}
+
+.checkbox-95:checked::after {
+  content: '✓';
+  display: block;
+  text-align: center;
+  line-height: 11px;
+  font-size: 10px;
+  color: #000000;
+}

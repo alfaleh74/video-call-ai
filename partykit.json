@@ -1,0 +1,5 @@
+{
+  "name": "webrtc-signaling",
+  "main": "party/index.ts"
+}
+
