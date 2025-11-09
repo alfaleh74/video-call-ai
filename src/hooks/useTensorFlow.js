@@ -114,17 +114,15 @@ export function useTensorFlow(videoRef, aiSettings) {
         setActiveModels({ ...modelsRef.current });
       }
       
-      // 3D Hand Pose (MediaPipe Hands via TFJS API)
+      // 3D Hand Pose (TFJS runtime to avoid bundling @mediapipe/hands)
       if (aiSettings.handPose3D && !modelsRef.current.handPose3D) {
-        console.log('[useTensorFlow] Loading 3D Hand Pose (MediaPipe Hands)...');
+        console.log('[useTensorFlow] Loading 3D Hand Pose (TFJS runtime)...');
         const handPoseModule = await import('@tensorflow-models/hand-pose-detection');
         const model = handPoseModule.SupportedModels.MediaPipeHands;
         modelsRef.current.handPose3D = await handPoseModule.createDetector(model, {
-          // Use MediaPipe runtime for performance; falls back to CDN assets
-          runtime: 'mediapipe',
-          modelType: 'full', // or 'lite' for speed; 'full' more accurate
-          maxHands: 2,
-          solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands'
+          runtime: 'tfjs',
+          modelType: 'full', // 'lite' for speed; 'full' more accurate
+          maxHands: 2
         });
         console.log('[useTensorFlow] ✅ 3D Hand Pose loaded');
         setActiveModels({ ...modelsRef.current });
