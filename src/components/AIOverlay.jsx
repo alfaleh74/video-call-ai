@@ -42,9 +42,24 @@ export default function AIOverlay({ videoRef, getResults, aiEnabled = true }) {
         canvas.height = displayHeight;
       }
 
-      // Calculate scaling factors
-      const scaleX = displayWidth / videoWidth;
-      const scaleY = displayHeight / videoHeight;
+      // Calculate object-fit: cover scaling and offsets
+      // With object-fit: cover, video fills the container and crops excess
+      const videoAspect = videoWidth / videoHeight;
+      const displayAspect = displayWidth / displayHeight;
+      
+      let scale, offsetX, offsetY;
+      
+      if (displayAspect > videoAspect) {
+        // Display is wider than video - video is scaled to fit width, height is cropped
+        scale = displayWidth / videoWidth;
+        offsetX = 0;
+        offsetY = (displayHeight - videoHeight * scale) / 2;
+      } else {
+        // Display is taller than video - video is scaled to fit height, width is cropped
+        scale = displayHeight / videoHeight;
+        offsetX = (displayWidth - videoWidth * scale) / 2;
+        offsetY = 0;
+      }
 
       // Always clear canvas first
       clearCanvas(ctx);
@@ -53,9 +68,10 @@ export default function AIOverlay({ videoRef, getResults, aiEnabled = true }) {
       if (aiEnabled) {
         const aiResults = getResults ? getResults() : {};
 
-        // Apply coordinate scaling transform
+        // Apply coordinate scaling transform to match object-fit: cover
         ctx.save();
-        ctx.scale(scaleX, scaleY);
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
 
         if (aiResults.objects && aiResults.objects.length > 0) {
           renderObjectDetections(aiResults.objects, ctx);
