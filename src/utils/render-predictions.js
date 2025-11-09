@@ -9,8 +9,6 @@
 export function renderObjectDetections(predictions, ctx) {
   if (!predictions || predictions.length === 0) return;
 
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
   // Font setup
   const font = "16px sans-serif";
   ctx.font = font;
