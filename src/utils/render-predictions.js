@@ -125,30 +125,43 @@ export function renderHandLandmarks(hands, ctx) {
   // Pre-compute fingertip indices as Set for O(1) lookup
   const fingertipIndices = new Set([0, 4, 8, 12, 16, 20]);
   
-  // Canvas bounds
+  // Canvas bounds - use strict integer boundaries
   const canvasWidth = ctx.canvas.width;
   const canvasHeight = ctx.canvas.height;
   
-  // Helper: check if a point is strictly within canvas bounds
-  // No margin - dots must be completely on screen to be rendered
+  // Helper: check if a point is strictly within canvas bounds with a safety margin
+  // Prevent edge-wrapping artifacts by excluding points very close to edges
   const isInBounds = (x, y) => {
-    // Check for valid numbers and strict canvas boundaries
+    // Check for valid numbers
     if (typeof x !== 'number' || typeof y !== 'number' || 
         !isFinite(x) || !isFinite(y) || isNaN(x) || isNaN(y)) {
       return false;
     }
-    // Strict bounds: point must be inside the canvas (0 to width/height)
-    return x >= 0 && x <= canvasWidth && y >= 0 && y <= canvasHeight;
+    // Strict bounds with 1px inset to prevent edge artifacts
+    // Points must be at least 1px away from right and bottom edges
+    return x >= 0 && x < canvasWidth - 1 && y >= 0 && y < canvasHeight - 1;
   };
 
   hands.forEach((hand) => {
     const keypoints = hand.keypoints;
     if (!keypoints || keypoints.length === 0) return;
 
-    // Determine available depth values from keypoints (if present)
-    const zValues = keypoints.map(k => k.z).filter(z => typeof z === 'number' && !Number.isNaN(z));
-    const hasDepth = zValues.length === keypoints.length && zValues.length > 0;
-    // Normalize z for simple depth cue: smaller (closer) -> larger radius
+    // Filter and validate all keypoints first
+    const validKeypoints = keypoints.map((kp, idx) => {
+      if (!kp) return null;
+      const x = kp.x;
+      const y = kp.y;
+      const z = kp.z;
+      // Validate coordinates
+      if (!isInBounds(x, y)) return null;
+      return { x, y, z, index: idx };
+    });
+
+    // Determine available depth values from valid keypoints
+    const zValues = validKeypoints
+      .filter(kp => kp && typeof kp.z === 'number' && !isNaN(kp.z))
+      .map(kp => kp.z);
+    const hasDepth = zValues.length > 0 && zValues.length === validKeypoints.filter(kp => kp).length;
     let zMin = 0, zMax = 0, zRange = 1;
     if (hasDepth) {
       zMin = Math.min(...zValues);
@@ -160,18 +173,19 @@ export function renderHandLandmarks(hands, ctx) {
     const isLeft = hand.handedness === 'Left';
     const handColor = isLeft ? "#00FF00" : "#00FFFF"; // Green for left, cyan for right
     
-    // OPTIMIZATION: Batch all connections into a single path (only if both endpoints are in bounds)
+    // Save context state to prevent any transform leaking
+    ctx.save();
+    
+    // OPTIMIZATION: Batch all connections into a single path (only if both endpoints are valid and in bounds)
     ctx.strokeStyle = handColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
     for (let i = 0; i < connections.length; i++) {
       const [start, end] = connections[i];
-      const kpStart = keypoints[start];
-      const kpEnd = keypoints[end];
-      // Only draw connection if both points exist and are within bounds
-      if (kpStart && kpEnd && 
-          isInBounds(kpStart.x, kpStart.y) && 
-          isInBounds(kpEnd.x, kpEnd.y)) {
+      const kpStart = validKeypoints[start];
+      const kpEnd = validKeypoints[end];
+      // Only draw connection if both points are valid
+      if (kpStart && kpEnd) {
         ctx.moveTo(kpStart.x, kpStart.y);
         ctx.lineTo(kpEnd.x, kpEnd.y);
       }
@@ -179,47 +193,50 @@ export function renderHandLandmarks(hands, ctx) {
     ctx.stroke();
     
     // OPTIMIZATION: Batch keypoint fills and strokes separately
-    // First pass: draw all filled circles (only for points in bounds)
+    // First pass: draw all filled circles (only for valid points)
     ctx.fillStyle = handColor;
     ctx.beginPath();
-    for (let i = 0; i < keypoints.length; i++) {
-      const keypoint = keypoints[i];
-      if (!keypoint || !isInBounds(keypoint.x, keypoint.y)) continue;
+    for (let i = 0; i < validKeypoints.length; i++) {
+      const kp = validKeypoints[i];
+      if (!kp) continue;
       
       // Larger circle for wrist and fingertips
-      let baseRadius = fingertipIndices.has(i) ? 6 : 4;
+      let baseRadius = fingertipIndices.has(kp.index) ? 6 : 4;
 
-      if (hasDepth) {
+      if (hasDepth && typeof kp.z === 'number') {
         // Map z to [0.7, 1.3] scale; closer (smaller z) -> larger
-        const t = (keypoint.z - zMin) / zRange;
+        const t = (kp.z - zMin) / zRange;
         const scale = 1.3 - 0.6 * t;
         baseRadius *= scale;
       }
       
-      ctx.moveTo(keypoint.x + baseRadius, keypoint.y);
-      ctx.arc(keypoint.x, keypoint.y, baseRadius, 0, 2 * Math.PI);
+      ctx.moveTo(kp.x + baseRadius, kp.y);
+      ctx.arc(kp.x, kp.y, baseRadius, 0, 2 * Math.PI);
     }
     ctx.fill();
     
-    // Second pass: draw white borders in one stroke (only for points in bounds)
+    // Second pass: draw white borders in one stroke (only for valid points)
     ctx.strokeStyle = "#FFFFFF";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let i = 0; i < keypoints.length; i++) {
-      const keypoint = keypoints[i];
-      if (!keypoint || !isInBounds(keypoint.x, keypoint.y)) continue;
+    for (let i = 0; i < validKeypoints.length; i++) {
+      const kp = validKeypoints[i];
+      if (!kp) continue;
       
-      let baseRadius = fingertipIndices.has(i) ? 6 : 4;
-      if (hasDepth) {
-        const t = (keypoint.z - zMin) / zRange;
+      let baseRadius = fingertipIndices.has(kp.index) ? 6 : 4;
+      if (hasDepth && typeof kp.z === 'number') {
+        const t = (kp.z - zMin) / zRange;
         const scale = 1.3 - 0.6 * t;
         baseRadius *= scale;
       }
       
-      ctx.moveTo(keypoint.x + baseRadius, keypoint.y);
-      ctx.arc(keypoint.x, keypoint.y, baseRadius, 0, 2 * Math.PI);
+      ctx.moveTo(kp.x + baseRadius, kp.y);
+      ctx.arc(kp.x, kp.y, baseRadius, 0, 2 * Math.PI);
     }
     ctx.stroke();
+    
+    // Restore context state
+    ctx.restore();
   });
 }
 
