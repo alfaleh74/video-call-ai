@@ -129,15 +129,10 @@ export function renderHandLandmarks(hands, ctx) {
   const canvasWidth = ctx.canvas.width;
   const canvasHeight = ctx.canvas.height;
   
-  // Helper: check if a point is within canvas bounds using a conservative rule:
-  // Only draw if the point is strictly inside the viewport (no margin) and finite.
-  // This avoids edge-wrapping artifacts when points clamp to 0 or canvas size.
-  const isPointVisible = (x, y, radius = 6) => {
-    if (typeof x !== 'number' || typeof y !== 'number' || 
-        isNaN(x) || isNaN(y) || !isFinite(x) || !isFinite(y)) {
-      return false;
-    }
-    return x > 0 && x < canvasWidth && y > 0 && y < canvasHeight;
+  // Helper: check if a point is within canvas bounds (with small margin for circles)
+  const isInBounds = (x, y, margin = 10) => {
+    return x >= -margin && x <= canvasWidth + margin && 
+           y >= -margin && y <= canvasHeight + margin;
   };
 
   hands.forEach((hand) => {
@@ -159,64 +154,64 @@ export function renderHandLandmarks(hands, ctx) {
     const isLeft = hand.handedness === 'Left';
     const handColor = isLeft ? "#00FF00" : "#00FFFF"; // Green for left, cyan for right
     
-    // Precompute processed keypoints with radius and visibility
-    const processed = keypoints.map((kp, i) => {
-      if (!kp) return null;
-      let baseRadius = fingertipIndices.has(i) ? 6 : 4;
-      if (hasDepth) {
-        const t = (kp.z - zMin) / zRange;
-        const scale = 1.3 - 0.6 * t;
-        baseRadius *= scale;
-      }
-      // Clamp radius to reasonable range to prevent extreme values
-      const radius = Math.max(2, Math.min(12, baseRadius));
-      const visible = isPointVisible(kp.x, kp.y, radius);
-      return { x: kp.x, y: kp.y, radius, visible };
-    });
-    
-    // OPTIMIZATION: Batch all connections into a single path (only if both endpoints are visible)
+    // OPTIMIZATION: Batch all connections into a single path (only if both endpoints are in bounds)
     ctx.strokeStyle = handColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    // Define a max reasonable link length to avoid spurious long segments across the screen
-    const maxDim = Math.max(canvasWidth, canvasHeight);
-    const maxDistSq = (maxDim * 0.5) * (maxDim * 0.5); // 50% of max dimension
     for (let i = 0; i < connections.length; i++) {
       const [start, end] = connections[i];
-      const pStart = processed[start];
-      const pEnd = processed[end];
-      if (pStart && pEnd && pStart.visible && pEnd.visible) {
-        const dx = pStart.x - pEnd.x;
-        const dy = pStart.y - pEnd.y;
-        // Skip drawing if the segment is unreasonably long (likely due to clamped/outlier points)
-        if ((dx * dx + dy * dy) > maxDistSq) continue;
-        ctx.moveTo(pStart.x, pStart.y);
-        ctx.lineTo(pEnd.x, pEnd.y);
+      const kpStart = keypoints[start];
+      const kpEnd = keypoints[end];
+      // Only draw connection if both points exist and are within bounds
+      if (kpStart && kpEnd && 
+          isInBounds(kpStart.x, kpStart.y) && 
+          isInBounds(kpEnd.x, kpEnd.y)) {
+        ctx.moveTo(kpStart.x, kpStart.y);
+        ctx.lineTo(kpEnd.x, kpEnd.y);
       }
     }
     ctx.stroke();
     
     // OPTIMIZATION: Batch keypoint fills and strokes separately
-    // First pass: draw all filled circles (only for visible points)
+    // First pass: draw all filled circles (only for points in bounds)
     ctx.fillStyle = handColor;
     ctx.beginPath();
-    for (let i = 0; i < processed.length; i++) {
-      const p = processed[i];
-      if (!p || !p.visible) continue;
-      ctx.moveTo(p.x + p.radius, p.y);
-      ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
+    for (let i = 0; i < keypoints.length; i++) {
+      const keypoint = keypoints[i];
+      if (!keypoint || !isInBounds(keypoint.x, keypoint.y)) continue;
+      
+      // Larger circle for wrist and fingertips
+      let baseRadius = fingertipIndices.has(i) ? 6 : 4;
+
+      if (hasDepth) {
+        // Map z to [0.7, 1.3] scale; closer (smaller z) -> larger
+        const t = (keypoint.z - zMin) / zRange;
+        const scale = 1.3 - 0.6 * t;
+        baseRadius *= scale;
+      }
+      
+      ctx.moveTo(keypoint.x + baseRadius, keypoint.y);
+      ctx.arc(keypoint.x, keypoint.y, baseRadius, 0, 2 * Math.PI);
     }
     ctx.fill();
     
-    // Second pass: draw white borders in one stroke (only for visible points)
+    // Second pass: draw white borders in one stroke (only for points in bounds)
     ctx.strokeStyle = "#FFFFFF";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let i = 0; i < processed.length; i++) {
-      const p = processed[i];
-      if (!p || !p.visible) continue;
-      ctx.moveTo(p.x + p.radius, p.y);
-      ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
+    for (let i = 0; i < keypoints.length; i++) {
+      const keypoint = keypoints[i];
+      if (!keypoint || !isInBounds(keypoint.x, keypoint.y)) continue;
+      
+      let baseRadius = fingertipIndices.has(i) ? 6 : 4;
+      if (hasDepth) {
+        const t = (keypoint.z - zMin) / zRange;
+        const scale = 1.3 - 0.6 * t;
+        baseRadius *= scale;
+      }
+      
+      ctx.moveTo(keypoint.x + baseRadius, keypoint.y);
+      ctx.arc(keypoint.x, keypoint.y, baseRadius, 0, 2 * Math.PI);
     }
     ctx.stroke();
   });
