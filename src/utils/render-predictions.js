@@ -129,10 +129,16 @@ export function renderHandLandmarks(hands, ctx) {
   const canvasWidth = ctx.canvas.width;
   const canvasHeight = ctx.canvas.height;
   
-  // Helper: check if a point is within canvas bounds (with small margin for circles)
-  const isInBounds = (x, y, margin = 10) => {
-    return x >= -margin && x <= canvasWidth + margin && 
-           y >= -margin && y <= canvasHeight + margin;
+  // Helper: check if a point is strictly within canvas bounds
+  // No margin - dots must be completely on screen to be rendered
+  const isInBounds = (x, y) => {
+    // Check for valid numbers and strict canvas boundaries
+    if (typeof x !== 'number' || typeof y !== 'number' || 
+        !isFinite(x) || !isFinite(y) || isNaN(x) || isNaN(y)) {
+      return false;
+    }
+    // Strict bounds: point must be inside the canvas (0 to width/height)
+    return x >= 0 && x <= canvasWidth && y >= 0 && y <= canvasHeight;
   };
 
   hands.forEach((hand) => {
