@@ -128,8 +128,8 @@ export function useTensorFlow(videoRef, aiSettings) {
         hands.setOptions({
           modelComplexity: 1,
           maxNumHands: 2,
-          // Enable selfie mode to better support front cameras; MediaPipe flips internally
-          selfieMode: true,
+          // Disable selfie mode to get correct coordinates; we handle mirroring at render time if needed
+          selfieMode: false,
           minDetectionConfidence: 0.3,
           minTrackingConfidence: 0.3,
         });
