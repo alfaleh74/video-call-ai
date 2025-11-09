@@ -24,6 +24,7 @@ export default function CallPage() {
   const [aiSettings, setAISettings] = useState({
     objectDetection: false,
     imageClassification: false,
+    handPose3D: false,
   });
   const [aiResults, setAIResults] = useState(null); // local pixel-space results
   const [remoteAIResults, setRemoteAIResults] = useState(null); // remote pixel-space results

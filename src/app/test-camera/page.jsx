@@ -16,6 +16,7 @@ export default function TestCameraPage() {
   const [aiSettings, setAISettings] = useState({
     objectDetection: false,
     imageClassification: false,
+    handPose3D: false,
   });
   const [error, setError] = useState(null);
   const [facingMode, setFacingMode] = useState("user");

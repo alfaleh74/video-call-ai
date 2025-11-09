@@ -126,6 +126,21 @@ export function renderHandLandmarks(hands, ctx) {
   hands.forEach((hand) => {
     const keypoints = hand.keypoints;
     if (!keypoints || keypoints.length === 0) return;
+
+    // Determine available depth values from keypoints (if present)
+    const zValues = keypoints.map(k => k.z).filter(z => typeof z === 'number' && !Number.isNaN(z));
+    const hasDepth = zValues.length === keypoints.length && zValues.length > 0;
+    // Normalize z for simple depth cue: smaller (closer) -> larger radius
+    let zMin = 0, zMax = 0;
+    if (hasDepth) {
+      zMin = Math.min(...zValues);
+      zMax = Math.max(...zValues);
+      // Avoid degenerate range
+      if (zMin === zMax) {
+        zMin -= 0.001;
+        zMax += 0.001;
+      }
+    }
     
     // Determine hand color (left vs right)
     const isLeft = hand.handedness === 'Left';
@@ -147,7 +162,16 @@ export function renderHandLandmarks(hands, ctx) {
     keypoints.forEach((keypoint, index) => {
       // Larger circle for wrist (index 0) and fingertips (4, 8, 12, 16, 20)
       const isFingertip = [0, 4, 8, 12, 16, 20].includes(index);
-      const radius = isFingertip ? 6 : 4;
+      let baseRadius = isFingertip ? 6 : 4;
+
+      if (hasDepth) {
+        // Map z to [0.7, 1.3] scale; closer (smaller z) -> larger
+        const t = (keypoint.z - zMin) / (zMax - zMin);
+        const scale = 1.3 - 0.6 * t;
+        baseRadius = baseRadius * scale;
+      }
+
+      const radius = baseRadius;
       
       ctx.fillStyle = handColor;
       ctx.beginPath();
@@ -164,12 +188,13 @@ export function renderHandLandmarks(hands, ctx) {
     if (keypoints[0]) {
       const wrist = keypoints[0];
       ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-      ctx.fillRect(wrist.x - 30, wrist.y - 30, 60, 20);
+      ctx.fillRect(wrist.x - 36, wrist.y - 30, 72, 20);
       
       ctx.fillStyle = handColor;
       ctx.font = "12px Arial";
       ctx.textAlign = "center";
-      ctx.fillText(hand.handedness || 'Hand', wrist.x, wrist.y - 15);
+      const label = hasDepth ? `${hand.handedness || 'Hand'} 3D` : (hand.handedness || 'Hand');
+      ctx.fillText(label, wrist.x, wrist.y - 15);
     }
   });
 }

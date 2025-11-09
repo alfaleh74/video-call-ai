@@ -12,6 +12,7 @@ export default function AISettings({ onSettingsChange, isInitiator }) {
   const [settings, setSettings] = useState({
     objectDetection: false,
     imageClassification: false,
+    handPose3D: false,
   });
   
   const deviceInfo = useDeviceDetection();
@@ -32,6 +33,13 @@ export default function AISettings({ onSettingsChange, isInitiator }) {
       name: "Image Classification",
       description: "Identify overall scene/subject (1000+ categories)",
       icon: "🏷️",
+      status: "ready",
+    },
+    {
+      id: "handPose3D",
+      name: "3D Hand Pose",
+      description: "Track 21 landmarks with depth (MediaPipe Hands)",
+      icon: "✋",
       status: "ready",
     },
   ];

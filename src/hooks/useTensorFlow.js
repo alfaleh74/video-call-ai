@@ -5,7 +5,6 @@ import * as tf from "@tensorflow/tfjs";
 
 // TODO: Add when ready
 // import * as poseDetection from "@tensorflow-models/pose-detection";
-// import * as handPoseDetection from "@tensorflow-models/hand-pose-detection";
 // import * as faceDetection from "@tensorflow-models/face-detection";
 // import * as bodyPix from "@tensorflow-models/body-pix";
 
@@ -115,6 +114,22 @@ export function useTensorFlow(videoRef, aiSettings) {
         setActiveModels({ ...modelsRef.current });
       }
       
+      // 3D Hand Pose (MediaPipe Hands via TFJS API)
+      if (aiSettings.handPose3D && !modelsRef.current.handPose3D) {
+        console.log('[useTensorFlow] Loading 3D Hand Pose (MediaPipe Hands)...');
+        const handPoseModule = await import('@tensorflow-models/hand-pose-detection');
+        const model = handPoseModule.SupportedModels.MediaPipeHands;
+        modelsRef.current.handPose3D = await handPoseModule.createDetector(model, {
+          // Use MediaPipe runtime for performance; falls back to CDN assets
+          runtime: 'mediapipe',
+          modelType: 'full', // or 'lite' for speed; 'full' more accurate
+          maxHands: 2,
+          solutionPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/hands'
+        });
+        console.log('[useTensorFlow] ✅ 3D Hand Pose loaded');
+        setActiveModels({ ...modelsRef.current });
+      }
+      
       // Background segmentation removed per user request
       
       setIsLoading(false);
@@ -207,6 +222,41 @@ export function useTensorFlow(videoRef, aiSettings) {
   }, []);
 
   /**
+   * Run 3D hand pose on video frame
+   */
+  const runHandPose3D = useCallback(async (videoElement) => {
+    if (!modelsRef.current.handPose3D) return null;
+
+    try {
+      const hands = await modelsRef.current.handPose3D.estimateHands(videoElement);
+      if (!hands || hands.length === 0) return null;
+
+      return hands.map(hand => ({
+        handedness: hand.handedness, // 'Left' | 'Right'
+        score: hand.score,
+        // 2D keypoints for overlay in pixel space
+        keypoints: (hand.keypoints || []).map(kp => ({
+          x: kp.x,
+          y: kp.y,
+          // z may be present on 2D keypoints too; preserve if so
+          z: kp.z,
+          name: kp.name
+        })),
+        // 3D keypoints (metric space), if available
+        keypoints3D: (hand.keypoints3D || []).map(kp3 => ({
+          x: kp3.x,
+          y: kp3.y,
+          z: kp3.z,
+          name: kp3.name
+        }))
+      }));
+    } catch (error) {
+      console.error('[useTensorFlow] 3D hand pose error:', error);
+      return null;
+    }
+  }, []);
+
+  /**
    * Run background segmentation on video frame
    */
   const runBackgroundSegmentation = useCallback(async (videoElement) => {
@@ -279,6 +329,14 @@ export function useTensorFlow(videoRef, aiSettings) {
           results.hands = hands;
         }
       }
+
+      // 3D Hand Pose
+      if (aiSettings.handPose3D) {
+        const hands = await runHandPose3D(videoElement);
+        if (hands) {
+          results.hands = hands;
+        }
+      }
       
       // Store results
       lastResultsRef.current = results;
@@ -286,7 +344,7 @@ export function useTensorFlow(videoRef, aiSettings) {
     } catch (error) {
       console.error('[useTensorFlow] Detection error:', error);
     }
-  }, [videoRef, tfReady, aiSettings, runObjectDetection, runImageClassification, runHandTracking]);
+  }, [videoRef, tfReady, aiSettings, runObjectDetection, runImageClassification, runHandTracking, runHandPose3D]);
 
   /**
    * Load models when settings change

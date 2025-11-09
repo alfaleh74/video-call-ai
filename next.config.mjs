@@ -10,6 +10,8 @@ const nextConfig = {
     '@tensorflow/tfjs-backend-webgl',
     '@tensorflow-models/coco-ssd',
     '@tensorflow-models/mobilenet',
+    '@tensorflow-models/hand-pose-detection',
+    '@mediapipe/hands',
   ],
   
   // Turbopack configuration (required in Next.js 16 when webpack config is present)
