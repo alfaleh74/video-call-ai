@@ -129,31 +129,52 @@ export function renderHandLandmarks(hands, ctx) {
   const canvasWidth = ctx.canvas.width;
   const canvasHeight = ctx.canvas.height;
   
-  // Helper: check if a point is strictly within canvas bounds with a safety margin
-  // Prevent edge-wrapping artifacts by excluding points very close to edges
+  // Helper: check if a point is strictly within canvas bounds
+  // Aggressively filter any point that could cause wrapping
   const isInBounds = (x, y) => {
     // Check for valid numbers
     if (typeof x !== 'number' || typeof y !== 'number' || 
         !isFinite(x) || !isFinite(y) || isNaN(x) || isNaN(y)) {
       return false;
     }
-    // Strict bounds with 1px inset to prevent edge artifacts
-    // Points must be at least 1px away from right and bottom edges
-    return x >= 0 && x < canvasWidth - 1 && y >= 0 && y < canvasHeight - 1;
+    
+    // AGGRESSIVE FILTERING: Exclude points within 5px of ANY edge
+    // This prevents wrapping artifacts caused by coordinate normalization
+    const margin = 5;
+    return x > margin && x < (canvasWidth - margin) && 
+           y > margin && y < (canvasHeight - margin);
   };
 
   hands.forEach((hand) => {
     const keypoints = hand.keypoints;
     if (!keypoints || keypoints.length === 0) return;
 
-    // Filter and validate all keypoints first
+    // Filter and validate all keypoints first with aggressive bounds checking
     const validKeypoints = keypoints.map((kp, idx) => {
       if (!kp) return null;
-      const x = kp.x;
-      const y = kp.y;
+      
+      // Extract and validate raw coordinates
+      let x = kp.x;
+      let y = kp.y;
       const z = kp.z;
-      // Validate coordinates
-      if (!isInBounds(x, y)) return null;
+      
+      // Check for sentinel value indicating off-screen point
+      if (x === -9999 || y === -9999 || x < -100 || y < -100) {
+        return null;
+      }
+      
+      // If coordinates appear to be normalized (0-1 range), they shouldn't be here
+      // This would indicate a bug in the data pipeline
+      if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+        // These are normalized coords that should have been converted - skip them
+        return null;
+      }
+      
+      // Validate coordinates are within bounds
+      if (!isInBounds(x, y)) {
+        return null;
+      }
+      
       return { x, y, z, index: idx };
     });
 

@@ -273,12 +273,26 @@ export function useTensorFlow(videoRef, aiSettings) {
         const pts3 = lms3D[i] || [];
         const handness = handedness[i];
 
-        const keypoints = pts2.map((pt, idx) => ({
-          x: (pt.x <= 1 ? pt.x * videoW : pt.x),
-          y: (pt.y <= 1 ? pt.y * videoH : pt.y),
-          z: pt.z,
-          name: names[idx] || `kp_${idx}`
-        }));
+        const keypoints = pts2.map((pt, idx) => {
+          // MediaPipe returns normalized coordinates (0-1 range)
+          // Convert to pixel coordinates
+          let pixelX = pt.x * videoW;
+          let pixelY = pt.y * videoH;
+          
+          // If coordinates are outside valid bounds, set to -9999 to mark as off-screen
+          // This prevents wrapping artifacts when hand goes off-screen
+          if (pixelX < 0 || pixelX > videoW || pixelY < 0 || pixelY > videoH) {
+            pixelX = -9999;
+            pixelY = -9999;
+          }
+          
+          return {
+            x: pixelX,
+            y: pixelY,
+            z: pt.z,
+            name: names[idx] || `kp_${idx}`
+          };
+        });
 
         const keypoints3D = pts3.map((pt, idx) => ({
           x: pt.x,
