@@ -128,13 +128,22 @@ export function useTensorFlow(videoRef, aiSettings) {
         hands.setOptions({
           modelComplexity: 1,
           maxNumHands: 2,
-          selfieMode: false,
-          minDetectionConfidence: 0.5,
-          minTrackingConfidence: 0.5,
+          // Enable selfie mode to better support front cameras; MediaPipe flips internally
+          selfieMode: true,
+          minDetectionConfidence: 0.3,
+          minTrackingConfidence: 0.3,
         });
         hands.onResults((res) => {
           modelsRef.current.handPose3DLast = res;
         });
+        // Ensure internal resources are initialized before first send
+        if (hands.initialize) {
+          try {
+            await hands.initialize();
+          } catch (e) {
+            console.warn('[useTensorFlow] MediaPipe Hands initialize() not available or failed, continuing:', e);
+          }
+        }
         modelsRef.current.handPose3D = hands;
         console.log('[useTensorFlow] ✅ 3D Hand Pose (MediaPipe) ready');
         setActiveModels({ ...modelsRef.current });

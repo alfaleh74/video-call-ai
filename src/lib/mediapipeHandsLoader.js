@@ -23,9 +23,18 @@ export async function loadMediaPipeHands() {
       script.onload = () => {
         if (window.Hands) {
           resolve(window.Hands);
-        } else {
-          reject(new Error("MediaPipe Hands failed to load (no global Hands)."));
+          return;
         }
+        // Fallback: try dynamic import from npm package if global not found
+        import(/* @vite-ignore */ "@mediapipe/hands").then((mod) => {
+          if (mod && mod.Hands) {
+            resolve(mod.Hands);
+          } else {
+            reject(new Error("MediaPipe Hands failed to load (no global and no module Hands)."));
+          }
+        }).catch(() => {
+          reject(new Error("Failed to load MediaPipe Hands module."));
+        });
       };
       script.onerror = () => {
         reject(new Error("Failed to load MediaPipe Hands script."));
