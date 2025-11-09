@@ -129,16 +129,15 @@ export function renderHandLandmarks(hands, ctx) {
   const canvasWidth = ctx.canvas.width;
   const canvasHeight = ctx.canvas.height;
   
-  // Helper: check if a point is within canvas bounds using a radius-aware margin
-  // Also checks for invalid/NaN values that can cause rendering bugs
+  // Helper: check if a point is within canvas bounds using a conservative rule:
+  // Only draw if the point is strictly inside the viewport (no margin) and finite.
+  // This avoids edge-wrapping artifacts when points clamp to 0 or canvas size.
   const isPointVisible = (x, y, radius = 6) => {
     if (typeof x !== 'number' || typeof y !== 'number' || 
         isNaN(x) || isNaN(y) || !isFinite(x) || !isFinite(y)) {
       return false;
     }
-    const margin = Math.max(2, Math.min(16, radius + 2));
-    return x >= -margin && x < canvasWidth + margin && 
-           y >= -margin && y < canvasHeight + margin;
+    return x > 0 && x < canvasWidth && y > 0 && y < canvasHeight;
   };
 
   hands.forEach((hand) => {
@@ -179,11 +178,18 @@ export function renderHandLandmarks(hands, ctx) {
     ctx.strokeStyle = handColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
+    // Define a max reasonable link length to avoid spurious long segments across the screen
+    const maxDim = Math.max(canvasWidth, canvasHeight);
+    const maxDistSq = (maxDim * 0.5) * (maxDim * 0.5); // 50% of max dimension
     for (let i = 0; i < connections.length; i++) {
       const [start, end] = connections[i];
       const pStart = processed[start];
       const pEnd = processed[end];
       if (pStart && pEnd && pStart.visible && pEnd.visible) {
+        const dx = pStart.x - pEnd.x;
+        const dy = pStart.y - pEnd.y;
+        // Skip drawing if the segment is unreasonably long (likely due to clamped/outlier points)
+        if ((dx * dx + dy * dy) > maxDistSq) continue;
         ctx.moveTo(pStart.x, pStart.y);
         ctx.lineTo(pEnd.x, pEnd.y);
       }
