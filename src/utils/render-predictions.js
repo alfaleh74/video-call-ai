@@ -101,6 +101,7 @@ export function renderPoseKeypoints(poses, ctx) {
 /**
  * Render hand tracking landmarks
  * MediaPipe Hands provides 21 keypoints per hand
+ * Optimized with batched path operations
  */
 export function renderHandLandmarks(hands, ctx) {
   if (!hands || hands.length === 0) return;
@@ -121,6 +122,9 @@ export function renderHandLandmarks(hands, ctx) {
     [5, 9], [9, 13], [13, 17]
   ];
 
+  // Pre-compute fingertip indices as Set for O(1) lookup
+  const fingertipIndices = new Set([0, 4, 8, 12, 16, 20]);
+
   hands.forEach((hand) => {
     const keypoints = hand.keypoints;
     if (!keypoints || keypoints.length === 0) return;
@@ -129,71 +133,74 @@ export function renderHandLandmarks(hands, ctx) {
     const zValues = keypoints.map(k => k.z).filter(z => typeof z === 'number' && !Number.isNaN(z));
     const hasDepth = zValues.length === keypoints.length && zValues.length > 0;
     // Normalize z for simple depth cue: smaller (closer) -> larger radius
-    let zMin = 0, zMax = 0;
+    let zMin = 0, zMax = 0, zRange = 1;
     if (hasDepth) {
       zMin = Math.min(...zValues);
       zMax = Math.max(...zValues);
-      // Avoid degenerate range
-      if (zMin === zMax) {
-        zMin -= 0.001;
-        zMax += 0.001;
-      }
+      zRange = zMax - zMin || 0.002; // Avoid division by zero
     }
     
     // Determine hand color (left vs right)
     const isLeft = hand.handedness === 'Left';
     const handColor = isLeft ? "#00FF00" : "#00FFFF"; // Green for left, cyan for right
     
-    // Draw connections
+    // OPTIMIZATION: Batch all connections into a single path
     ctx.strokeStyle = handColor;
     ctx.lineWidth = 2;
-    connections.forEach(([start, end]) => {
-      if (keypoints[start] && keypoints[end]) {
-        ctx.beginPath();
-        ctx.moveTo(keypoints[start].x, keypoints[start].y);
-        ctx.lineTo(keypoints[end].x, keypoints[end].y);
-        ctx.stroke();
+    ctx.beginPath();
+    for (let i = 0; i < connections.length; i++) {
+      const [start, end] = connections[i];
+      const kpStart = keypoints[start];
+      const kpEnd = keypoints[end];
+      if (kpStart && kpEnd) {
+        ctx.moveTo(kpStart.x, kpStart.y);
+        ctx.lineTo(kpEnd.x, kpEnd.y);
       }
-    });
+    }
+    ctx.stroke();
     
-    // Draw keypoints
-    keypoints.forEach((keypoint, index) => {
-      // Larger circle for wrist (index 0) and fingertips (4, 8, 12, 16, 20)
-      const isFingertip = [0, 4, 8, 12, 16, 20].includes(index);
-      let baseRadius = isFingertip ? 6 : 4;
+    // OPTIMIZATION: Batch keypoint fills and strokes separately
+    // First pass: draw all filled circles
+    ctx.fillStyle = handColor;
+    ctx.beginPath();
+    for (let i = 0; i < keypoints.length; i++) {
+      const keypoint = keypoints[i];
+      if (!keypoint) continue;
+      
+      // Larger circle for wrist and fingertips
+      let baseRadius = fingertipIndices.has(i) ? 6 : 4;
 
       if (hasDepth) {
         // Map z to [0.7, 1.3] scale; closer (smaller z) -> larger
-        const t = (keypoint.z - zMin) / (zMax - zMin);
+        const t = (keypoint.z - zMin) / zRange;
         const scale = 1.3 - 0.6 * t;
-        baseRadius = baseRadius * scale;
+        baseRadius *= scale;
       }
-
-      const radius = baseRadius;
       
-      ctx.fillStyle = handColor;
-      ctx.beginPath();
-      ctx.arc(keypoint.x, keypoint.y, radius, 0, 2 * Math.PI);
-      ctx.fill();
-      
-      // White border for visibility
-      ctx.strokeStyle = "#FFFFFF";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    });
-    
-    // Draw hand label
-    if (keypoints[0]) {
-      const wrist = keypoints[0];
-      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-      ctx.fillRect(wrist.x - 36, wrist.y - 30, 72, 20);
-      
-      ctx.fillStyle = handColor;
-      ctx.font = "12px Arial";
-      ctx.textAlign = "center";
-      const label = hasDepth ? `${hand.handedness || 'Hand'} 3D` : (hand.handedness || 'Hand');
-      ctx.fillText(label, wrist.x, wrist.y - 15);
+      ctx.moveTo(keypoint.x + baseRadius, keypoint.y);
+      ctx.arc(keypoint.x, keypoint.y, baseRadius, 0, 2 * Math.PI);
     }
+    ctx.fill();
+    
+    // Second pass: draw white borders in one stroke
+    ctx.strokeStyle = "#FFFFFF";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < keypoints.length; i++) {
+      const keypoint = keypoints[i];
+      if (!keypoint) continue;
+      
+      let baseRadius = fingertipIndices.has(i) ? 6 : 4;
+      if (hasDepth) {
+        const t = (keypoint.z - zMin) / zRange;
+        const scale = 1.3 - 0.6 * t;
+        baseRadius *= scale;
+      }
+      
+      ctx.moveTo(keypoint.x + baseRadius, keypoint.y);
+      ctx.arc(keypoint.x, keypoint.y, baseRadius, 0, 2 * Math.PI);
+    }
+    ctx.stroke();
   });
 }
 
