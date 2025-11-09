@@ -130,9 +130,16 @@ export function renderHandLandmarks(hands, ctx) {
   const canvasHeight = ctx.canvas.height;
   
   // Helper: check if a point is within canvas bounds (with small margin for circles)
+  // Also checks for invalid/NaN values that can cause rendering bugs
   const isInBounds = (x, y, margin = 10) => {
-    return x >= -margin && x <= canvasWidth + margin && 
-           y >= -margin && y <= canvasHeight + margin;
+    // First check if values are valid numbers
+    if (typeof x !== 'number' || typeof y !== 'number' || 
+        isNaN(x) || isNaN(y) || !isFinite(x) || !isFinite(y)) {
+      return false;
+    }
+    // Then check bounds
+    return x >= -margin && x < canvasWidth + margin && 
+           y >= -margin && y < canvasHeight + margin;
   };
 
   hands.forEach((hand) => {
