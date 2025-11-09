@@ -101,7 +101,7 @@ export function renderPoseKeypoints(poses, ctx) {
 /**
  * Render hand tracking landmarks
  * MediaPipe Hands provides 21 keypoints per hand
- * Optimized with batched path operations
+ * Optimized with batched path operations and bounds checking
  */
 export function renderHandLandmarks(hands, ctx) {
   if (!hands || hands.length === 0) return;
@@ -124,6 +124,16 @@ export function renderHandLandmarks(hands, ctx) {
 
   // Pre-compute fingertip indices as Set for O(1) lookup
   const fingertipIndices = new Set([0, 4, 8, 12, 16, 20]);
+  
+  // Canvas bounds
+  const canvasWidth = ctx.canvas.width;
+  const canvasHeight = ctx.canvas.height;
+  
+  // Helper: check if a point is within canvas bounds (with small margin for circles)
+  const isInBounds = (x, y, margin = 10) => {
+    return x >= -margin && x <= canvasWidth + margin && 
+           y >= -margin && y <= canvasHeight + margin;
+  };
 
   hands.forEach((hand) => {
     const keypoints = hand.keypoints;
@@ -144,7 +154,7 @@ export function renderHandLandmarks(hands, ctx) {
     const isLeft = hand.handedness === 'Left';
     const handColor = isLeft ? "#00FF00" : "#00FFFF"; // Green for left, cyan for right
     
-    // OPTIMIZATION: Batch all connections into a single path
+    // OPTIMIZATION: Batch all connections into a single path (only if both endpoints are in bounds)
     ctx.strokeStyle = handColor;
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -152,7 +162,10 @@ export function renderHandLandmarks(hands, ctx) {
       const [start, end] = connections[i];
       const kpStart = keypoints[start];
       const kpEnd = keypoints[end];
-      if (kpStart && kpEnd) {
+      // Only draw connection if both points exist and are within bounds
+      if (kpStart && kpEnd && 
+          isInBounds(kpStart.x, kpStart.y) && 
+          isInBounds(kpEnd.x, kpEnd.y)) {
         ctx.moveTo(kpStart.x, kpStart.y);
         ctx.lineTo(kpEnd.x, kpEnd.y);
       }
@@ -160,12 +173,12 @@ export function renderHandLandmarks(hands, ctx) {
     ctx.stroke();
     
     // OPTIMIZATION: Batch keypoint fills and strokes separately
-    // First pass: draw all filled circles
+    // First pass: draw all filled circles (only for points in bounds)
     ctx.fillStyle = handColor;
     ctx.beginPath();
     for (let i = 0; i < keypoints.length; i++) {
       const keypoint = keypoints[i];
-      if (!keypoint) continue;
+      if (!keypoint || !isInBounds(keypoint.x, keypoint.y)) continue;
       
       // Larger circle for wrist and fingertips
       let baseRadius = fingertipIndices.has(i) ? 6 : 4;
@@ -182,13 +195,13 @@ export function renderHandLandmarks(hands, ctx) {
     }
     ctx.fill();
     
-    // Second pass: draw white borders in one stroke
+    // Second pass: draw white borders in one stroke (only for points in bounds)
     ctx.strokeStyle = "#FFFFFF";
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i < keypoints.length; i++) {
       const keypoint = keypoints[i];
-      if (!keypoint) continue;
+      if (!keypoint || !isInBounds(keypoint.x, keypoint.y)) continue;
       
       let baseRadius = fingertipIndices.has(i) ? 6 : 4;
       if (hasDepth) {
