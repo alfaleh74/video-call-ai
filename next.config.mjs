@@ -16,15 +16,6 @@ const nextConfig = {
   
   // Turbopack configuration (required in Next.js 16 when webpack config is present)
   turbopack: {},
-
-  // Alias problematic client import so Turbopack doesn't fail when bundling tf models
-  experimental: {
-    turbo: {
-      resolveAliases: {
-        '@mediapipe/hands': './src/shims/mediapipe-hands-stub.js',
-      },
-    },
-  },
 };
 
 export default nextConfig;

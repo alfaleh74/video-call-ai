@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import * as tf from "@tensorflow/tfjs";
+import { loadMediaPipeHands } from "@/lib/mediapipeHandsLoader";
 
 // TODO: Add when ready
 // import * as poseDetection from "@tensorflow-models/pose-detection";
@@ -70,6 +71,9 @@ export function useTensorFlow(videoRef, aiSettings) {
         if (model && model.dispose) {
           model.dispose();
         }
+        if (model && model.close) {
+          model.close();
+        }
       });
       modelsRef.current = {};
     };
@@ -114,17 +118,25 @@ export function useTensorFlow(videoRef, aiSettings) {
         setActiveModels({ ...modelsRef.current });
       }
       
-      // 3D Hand Pose (TFJS runtime to avoid bundling @mediapipe/hands)
+      // 3D Hand Pose using MediaPipe Hands via CDN (avoid ESM import issues)
       if (aiSettings.handPose3D && !modelsRef.current.handPose3D) {
-        console.log('[useTensorFlow] Loading 3D Hand Pose (TFJS runtime)...');
-        const handPoseModule = await import('@tensorflow-models/hand-pose-detection');
-        const model = handPoseModule.SupportedModels.MediaPipeHands;
-        modelsRef.current.handPose3D = await handPoseModule.createDetector(model, {
-          runtime: 'tfjs',
-          modelType: 'full', // 'lite' for speed; 'full' more accurate
-          maxHands: 2
+        console.log('[useTensorFlow] Loading 3D Hand Pose (MediaPipe via CDN)...');
+        const Hands = await loadMediaPipeHands();
+        const hands = new Hands({
+          locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
-        console.log('[useTensorFlow] ✅ 3D Hand Pose loaded');
+        hands.setOptions({
+          modelComplexity: 1,
+          maxNumHands: 2,
+          selfieMode: false,
+          minDetectionConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
+        hands.onResults((res) => {
+          modelsRef.current.handPose3DLast = res;
+        });
+        modelsRef.current.handPose3D = hands;
+        console.log('[useTensorFlow] ✅ 3D Hand Pose (MediaPipe) ready');
         setActiveModels({ ...modelsRef.current });
       }
       
@@ -226,28 +238,55 @@ export function useTensorFlow(videoRef, aiSettings) {
     if (!modelsRef.current.handPose3D) return null;
 
     try {
-      const hands = await modelsRef.current.handPose3D.estimateHands(videoElement);
-      if (!hands || hands.length === 0) return null;
+      const hands = modelsRef.current.handPose3D;
+      await hands.send({ image: videoElement });
+      const res = modelsRef.current.handPose3DLast;
+      if (!res) return null;
 
-      return hands.map(hand => ({
-        handedness: hand.handedness, // 'Left' | 'Right'
-        score: hand.score,
-        // 2D keypoints for overlay in pixel space
-        keypoints: (hand.keypoints || []).map(kp => ({
-          x: kp.x,
-          y: kp.y,
-          // z may be present on 2D keypoints too; preserve if so
-          z: kp.z,
-          name: kp.name
-        })),
-        // 3D keypoints (metric space), if available
-        keypoints3D: (hand.keypoints3D || []).map(kp3 => ({
-          x: kp3.x,
-          y: kp3.y,
-          z: kp3.z,
-          name: kp3.name
-        }))
-      }));
+      const videoW = videoElement.videoWidth || 0;
+      const videoH = videoElement.videoHeight || 0;
+      const names = [
+        "wrist",
+        "thumb_cmc","thumb_mcp","thumb_ip","thumb_tip",
+        "index_finger_mcp","index_finger_pip","index_finger_dip","index_finger_tip",
+        "middle_finger_mcp","middle_finger_pip","middle_finger_dip","middle_finger_tip",
+        "ring_finger_mcp","ring_finger_pip","ring_finger_dip","ring_finger_tip",
+        "pinky_finger_mcp","pinky_finger_pip","pinky_finger_dip","pinky_finger_tip"
+      ];
+
+      const out = [];
+      const lms2D = res.multiHandLandmarks || [];
+      const lms3D = res.multiHandWorldLandmarks || [];
+      const handedness = res.multiHandedness || [];
+
+      for (let i = 0; i < lms2D.length; i++) {
+        const pts2 = lms2D[i] || [];
+        const pts3 = lms3D[i] || [];
+        const handness = handedness[i];
+
+        const keypoints = pts2.map((pt, idx) => ({
+          x: (pt.x <= 1 ? pt.x * videoW : pt.x),
+          y: (pt.y <= 1 ? pt.y * videoH : pt.y),
+          z: pt.z,
+          name: names[idx] || `kp_${idx}`
+        }));
+
+        const keypoints3D = pts3.map((pt, idx) => ({
+          x: pt.x,
+          y: pt.y,
+          z: pt.z,
+          name: names[idx] || `kp_${idx}`
+        }));
+
+        out.push({
+          handedness: handness?.label || 'Hand',
+          score: handness?.score ?? 0,
+          keypoints,
+          keypoints3D,
+        });
+      }
+
+      return out.length ? out : null;
     } catch (error) {
       console.error('[useTensorFlow] 3D hand pose error:', error);
       return null;
