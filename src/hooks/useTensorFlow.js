@@ -239,18 +239,6 @@ export function useTensorFlow(videoRef, aiSettings) {
 
     try {
       const hands = modelsRef.current.handPose3D;
-
-      // Auto-configure selfieMode based on camera facing mode to fix left/right confusion
-      try {
-        const track = videoElement?.srcObject?.getVideoTracks?.()[0];
-        const facingMode = track?.getSettings?.().facingMode;
-        const desiredSelfieMode = facingMode === 'user';
-        if (modelsRef.current.handPose3DSelfieMode !== desiredSelfieMode) {
-          hands.setOptions({ selfieMode: desiredSelfieMode });
-          modelsRef.current.handPose3DSelfieMode = desiredSelfieMode;
-        }
-      } catch {}
-
       await hands.send({ image: videoElement });
       const res = modelsRef.current.handPose3DLast;
       if (!res) return null;
