@@ -124,6 +124,10 @@ export default function Home() {
                 <div className="text-[9px] text-gray-600 pl-2">
                   Runs machine learning models directly in the browser for real-time object detection
                 </div>
+                <div className="mt-1">• <strong>COCO-SSD</strong> - Object detection model</div>
+                <div className="text-[9px] text-gray-600 pl-2">
+                  Pre-trained model for detecting common objects in images and video streams
+                </div>
                 <div className="mt-1">• <strong>Next.js 16</strong> - React framework</div>
                 <div className="text-[9px] text-gray-600 pl-2">
                   Server-side rendering and modern React development framework
@@ -147,9 +151,6 @@ export default function Home() {
             <div className="separator-95 my-2"></div>
             <div className="text-[9px] text-gray-600 text-center">
               Version 1.0.0 | Build 19970815 | © 1997
-            </div>
-            <div className="text-[9px] text-gray-600 text-center mt-1">
-              Created by <strong>faysal al-faleh</strong>
             </div>
           </div>
         </div>
